@@ -1,22 +1,21 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ListTodo,
-  Plus,
-  Clock,
-  Repeat,
-  AlertTriangle,
-  CheckSquare,
-} from "lucide-react";
+import { CheckSquare, Clock, Repeat, AlertTriangle } from "lucide-react";
 import type { DashboardState, Task, ChecklistItem } from "@/lib/api";
-import { useToggleTask, useToggleOps, useAddTask, useChecklistComplete } from "@/hooks/use-dashboard";
+import { useToggleOps, useChecklistComplete } from "@/hooks/use-dashboard";
+import { buildOperationalChecklist } from "@/lib/daily-tasks";
 
-function TaskItem({ task, onToggle, isPending }: { task: Task; onToggle: (id: string, done: boolean) => void; isPending: boolean }) {
+function TaskItem({
+  task,
+  onToggle,
+  isPending,
+}: {
+  task: Task;
+  onToggle: (id: string, done: boolean) => void;
+  isPending: boolean;
+}) {
   const getPriorityColor = (p: string) => {
     if (p === "high" || p === "critical") return "border-red-500/30 text-red-400";
     if (p === "medium") return "border-amber-500/30 text-amber-400";
@@ -46,7 +45,9 @@ function TaskItem({ task, onToggle, isPending }: { task: Task; onToggle: (id: st
             </Badge>
           )}
           {task.deadline_at_msk && (
-            <span className={`text-xs flex items-center gap-1 ${task.is_overdue ? "text-red-400" : "text-muted-foreground"}`}>
+            <span
+              className={`text-xs flex items-center gap-1 ${task.is_overdue ? "text-red-400" : "text-muted-foreground"}`}
+            >
               <Clock className="w-3 h-3" />
               {task.deadline_at_msk}
             </span>
@@ -57,9 +58,7 @@ function TaskItem({ task, onToggle, isPending }: { task: Task; onToggle: (id: st
               {task.repeat}
             </span>
           )}
-          {task.assignee && (
-            <span className="text-xs text-muted-foreground">{task.assignee}</span>
-          )}
+          {task.assignee && <span className="text-xs text-muted-foreground">{task.assignee}</span>}
           {task.is_overdue && (
             <Badge variant="outline" className="text-xs border-red-500/30 text-red-400">
               <AlertTriangle className="w-3 h-3 mr-1" />
@@ -72,7 +71,15 @@ function TaskItem({ task, onToggle, isPending }: { task: Task; onToggle: (id: st
   );
 }
 
-function DailyChecklistItem({ item, onComplete, isPending }: { item: ChecklistItem; onComplete: (id: string) => void; isPending: boolean }) {
+function DailyChecklistItem({
+  item,
+  onComplete,
+  isPending,
+}: {
+  item: ChecklistItem;
+  onComplete: (id: string) => void;
+  isPending: boolean;
+}) {
   return (
     <div className="flex items-start gap-3 p-3 rounded-md bg-muted/50" data-testid={`checklist-${item.id}`}>
       <Checkbox
@@ -95,24 +102,11 @@ function DailyChecklistItem({ item, onComplete, isPending }: { item: ChecklistIt
 }
 
 export function TabTasks({ data, isLoading }: { data?: DashboardState; isLoading: boolean }) {
-  const [newTaskText, setNewTaskText] = useState("");
-  const toggleTask = useToggleTask();
   const toggleOps = useToggleOps();
-  const addTask = useAddTask();
   const checklistComplete = useChecklistComplete();
-
-  const handleToggle = (id: string, done: boolean) => {
-    toggleTask.mutate({ id, done });
-  };
 
   const handleOpsToggle = (id: string, done: boolean) => {
     toggleOps.mutate({ id, done });
-  };
-
-  const handleAddTask = () => {
-    if (!newTaskText.trim()) return;
-    addTask.mutate({ text: newTaskText.trim() });
-    setNewTaskText("");
   };
 
   const handleChecklistComplete = (itemId: string) => {
@@ -122,103 +116,106 @@ export function TabTasks({ data, isLoading }: { data?: DashboardState; isLoading
   if (isLoading || !data) {
     return (
       <div className="space-y-4 p-4">
-        {[1, 2, 3].map((i) => (
+        {[1, 2].map((i) => (
           <Card key={i}>
-            <CardHeader className="pb-3"><Skeleton className="h-5 w-40" /></CardHeader>
-            <CardContent><div className="space-y-3">{[1, 2, 3].map((j) => <Skeleton key={j} className="h-14 w-full" />)}</div></CardContent>
+            <CardHeader className="pb-3">
+              <Skeleton className="h-5 w-40" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[1, 2, 3].map((j) => (
+                  <Skeleton key={j} className="h-14 w-full" />
+                ))}
+              </div>
+            </CardContent>
           </Card>
         ))}
       </div>
     );
   }
 
-  const pendingTasks = data.tasks_today.filter((t) => !t.done);
-  const doneTasks = data.tasks_today.filter((t) => t.done);
+  const operationalChecklist = buildOperationalChecklist(data);
+  const pendingOps = data.ops_checklist.filter((t) => !t.done).length;
+  const pendingChecklist = operationalChecklist.filter((item) => !item.done).length;
 
   return (
     <div className="space-y-4 p-4" data-testid="tab-tasks">
       <Card>
-        <CardHeader className="flex flex-row items-center gap-2 pb-3">
-          <Plus className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base">Добавить задачу</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              placeholder="Текст новой задачи..."
-              onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
-              data-testid="input-new-task"
-            />
-            <Button onClick={handleAddTask} disabled={addTask.isPending || !newTaskText.trim()} data-testid="button-add-task">
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
           <div className="flex items-center gap-2">
-            <ListTodo className="w-5 h-5 text-primary" />
-            <CardTitle className="text-base">Задачи на сегодня</CardTitle>
+            <CheckSquare className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base">Ежедневные операции</CardTitle>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {pendingTasks.length} / {data.tasks_today.length}
+            Осталось: {pendingOps}
           </Badge>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {pendingTasks.map((task) => (
-              <TaskItem key={task.id} task={task} onToggle={handleToggle} isPending={toggleTask.isPending} />
+            {data.ops_checklist.map((task) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={handleOpsToggle}
+                isPending={toggleOps.isPending}
+              />
             ))}
-            {doneTasks.length > 0 && (
-              <div className="pt-2 border-t border-border/50">
-                <p className="text-xs text-muted-foreground mb-2">Выполнено ({doneTasks.length})</p>
-                {doneTasks.map((task) => (
-                  <TaskItem key={task.id} task={task} onToggle={handleToggle} isPending={toggleTask.isPending} />
-                ))}
-              </div>
-            )}
-            {data.tasks_today.length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">Задач на сегодня нет</p>
+            {data.ops_checklist.length === 0 && (
+              <p className="text-sm text-muted-foreground py-2">
+                Операционные задачи на сегодня не найдены
+              </p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {data.ops_checklist && data.ops_checklist.length > 0 && (
+      {operationalChecklist.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center gap-2 pb-3">
-            <CheckSquare className="w-5 h-5 text-primary" />
-            <CardTitle className="text-base">Ежедневные операции</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {data.ops_checklist.map((task) => (
-                <TaskItem key={task.id} task={task} onToggle={handleOpsToggle} isPending={toggleOps.isPending} />
-              ))}
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              <CardTitle className="text-base">Дополнительно на день</CardTitle>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {data.daily_checklist && data.daily_checklist.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 pb-3">
-            <Clock className="w-5 h-5 text-primary" />
-            <CardTitle className="text-base">Чек-лист дня</CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              Осталось: {pendingChecklist}
+            </Badge>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.daily_checklist.map((item) => (
+              {operationalChecklist.map((item) => (
                 <DailyChecklistItem
                   key={item.id}
                   item={item}
                   onComplete={handleChecklistComplete}
                   isPending={checklistComplete.isPending}
                 />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.supplier_deadlines.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2 pb-3">
+            <Clock className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base">Дедлайны заказов</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {data.supplier_deadlines.map((deadline) => (
+                <div
+                  key={deadline.name}
+                  className="flex items-center justify-between gap-3 p-3 rounded-md bg-muted/40"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{deadline.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{deadline.note}</p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0 text-xs">
+                    до {deadline.time}
+                  </Badge>
+                </div>
               ))}
             </div>
           </CardContent>

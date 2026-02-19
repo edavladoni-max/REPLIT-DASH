@@ -6,8 +6,12 @@ import {
   AlertTriangle,
   AlertCircle,
   CalendarDays,
+  CheckSquare,
+  Circle,
+  CheckCircle2,
 } from "lucide-react";
 import type { DashboardState } from "@/lib/api";
+import { buildDailyFocusTasks } from "@/lib/daily-tasks";
 
 function WeekShiftsCard({ data }: { data: DashboardState }) {
   const grid = data.shift_grid;
@@ -134,6 +138,69 @@ function WeekShiftsCard({ data }: { data: DashboardState }) {
   );
 }
 
+function DailyFocusCard({ data }: { data: DashboardState }) {
+  const items = buildDailyFocusTasks(data);
+  const remainingCount = items.filter((item) => !item.done).length;
+  const sourceLabel: Record<string, string> = {
+    ops: "Операции",
+    checklist: "Чек-лист",
+    supplier: "Дедлайн заказа",
+  };
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base">Ежедневные задачи</CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{data.today}</p>
+        </div>
+        <Badge variant={remainingCount > 0 ? "secondary" : "outline"} className="text-xs">
+          Осталось: {remainingCount}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        {items.length > 0 ? (
+          <div className="space-y-2">
+            {items.slice(0, 12).map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start justify-between gap-3 p-3 rounded-md bg-muted/40"
+              >
+                <div className="flex items-start gap-2 min-w-0">
+                  {item.done ? (
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-400" />
+                  ) : (
+                    <Circle className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm truncate ${item.done ? "line-through text-muted-foreground" : ""}`}
+                      title={item.text}
+                    >
+                      {item.text}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{sourceLabel[item.kind]}</p>
+                  </div>
+                </div>
+                {item.time && (
+                  <Badge variant="outline" className="text-[11px] shrink-0">
+                    {item.time}
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Операционные задачи на сегодня не найдены</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading: boolean }) {
   if (isLoading || !data) {
     return (
@@ -215,6 +282,8 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
           </CardContent>
         </Card>
       )}
+
+      <DailyFocusCard data={data} />
 
       <WeekShiftsCard data={data} />
 
