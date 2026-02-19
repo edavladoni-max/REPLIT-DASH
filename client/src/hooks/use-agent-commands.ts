@@ -135,3 +135,12 @@ export function useFailAgentCommand() {
     onSuccess: invalidateCommands,
   });
 }
+
+export function useSearchMemosContext() {
+  return useMutation({
+    mutationFn: async (payload: { query: string }) => {
+      const res = await apiRequest("POST", "/api/agent/memos/search", payload);
+      return res.json();
+    },
+  });
+}

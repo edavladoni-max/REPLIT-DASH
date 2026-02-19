@@ -13,6 +13,7 @@ import {
   useCreateAgentCommand,
   useFailAgentCommand,
   useRejectAgentCommand,
+  useSearchMemosContext,
   useStartAgentCommand,
 } from "@/hooks/use-agent-commands";
 
@@ -197,11 +198,13 @@ export function TabAgent() {
   const [details, setDetails] = useState("");
   const [memosQuery, setMemosQuery] = useState("");
   const [memosContext, setMemosContext] = useState("");
+  const [memosHint, setMemosHint] = useState("");
   const [requiresConfirmation, setRequiresConfirmation] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>("all");
 
   const commandsQuery = useAgentCommands(filter);
   const createMutation = useCreateAgentCommand();
+  const searchMemosMutation = useSearchMemosContext();
 
   const commands = useMemo(
     () => (Array.isArray(commandsQuery.data?.data) ? commandsQuery.data?.data : []),
@@ -209,6 +212,7 @@ export function TabAgent() {
   );
 
   const canSubmit = title.trim().length >= 3 && !createMutation.isPending;
+  const memosSearchQuery = (memosQuery.trim() || `${title} ${details}`.trim()).slice(0, 500);
 
   return (
     <div className="space-y-4 p-4" data-testid="tab-agent">
@@ -255,6 +259,37 @@ export function TabAgent() {
               rows={3}
             />
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              disabled={!memosSearchQuery || searchMemosMutation.isPending}
+              onClick={() => {
+                setMemosHint("");
+                searchMemosMutation.mutate(
+                  { query: memosSearchQuery },
+                  {
+                    onSuccess: (result: any) => {
+                      const data = result?.data;
+                      if (data?.query) setMemosQuery(data.query);
+                      if (data?.context) setMemosContext(data.context);
+                      const hitCount = Number(data?.hitCount || 0);
+                      setMemosHint(
+                        data?.error
+                          ? `MemOS: ${data.error}`
+                          : `MemOS: найдено ${hitCount} записей, контекст обновлен.`,
+                      );
+                    },
+                    onError: (error: any) => {
+                      setMemosHint(`MemOS: ${error?.message || "ошибка запроса"}`);
+                    },
+                  },
+                );
+              }}
+            >
+              Подтянуть из MemOS
+            </Button>
+            {memosHint && <p className="text-xs text-muted-foreground">{memosHint}</p>}
+          </div>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <input
               type="checkbox"
@@ -285,6 +320,7 @@ export function TabAgent() {
                     setDetails("");
                     setMemosQuery("");
                     setMemosContext("");
+                    setMemosHint("");
                   },
                 },
               );

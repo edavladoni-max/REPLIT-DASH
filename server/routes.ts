@@ -13,6 +13,7 @@ import {
   updateContextSchema,
   type AgentCommandStoreSetup,
 } from "./agent-commands";
+import { createMemosAutoContextProvider } from "./memos-context";
 import { ZodError } from "zod";
 
 let sshConnection: Client | null = null;
@@ -206,6 +207,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   const commandStoreSetup: AgentCommandStoreSetup = await createAgentCommandStore();
   const commandStore: AgentCommandStore = commandStoreSetup.store;
+  const memosAutoContext = createMemosAutoContextProvider();
 
   app.get("/api/agent/health", (_req: Request, res: Response) => {
     res.json({
@@ -213,6 +215,7 @@ export async function registerRoutes(
       data: {
         mode: commandStoreSetup.mode,
         reason: commandStoreSetup.reason || "",
+        memos: memosAutoContext.status(),
       },
     });
   });
@@ -233,8 +236,23 @@ export async function registerRoutes(
   app.post("/api/agent/commands", async (req: Request, res: Response) => {
     try {
       const payload = createAgentCommandSchema.parse(req.body || {});
-      const data = await commandStore.create(payload);
-      res.status(201).json({ ok: true, data });
+      const enriched = await memosAutoContext.enrichCreatePayload(payload);
+      const data = await commandStore.create(enriched.payload);
+      res.status(201).json({ ok: true, data, meta: { memos: enriched.meta } });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/memos/search", async (req: Request, res: Response) => {
+    try {
+      const query = String(req.body?.query || "").trim();
+      if (!query) {
+        res.status(400).json({ ok: false, error: "Query is required." });
+        return;
+      }
+      const data = await memosAutoContext.searchToContext(query);
+      res.json({ ok: true, data });
     } catch (error) {
       sendAgentCommandError(res, error);
     }
