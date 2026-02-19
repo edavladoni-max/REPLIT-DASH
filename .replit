@@ -37,3 +37,9 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+DASHBOARD_PASSWORD = "KLz6w7b6O9oLPPaU"
+VPS_API_PORT = "8080"
