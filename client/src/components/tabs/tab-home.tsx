@@ -4,55 +4,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Clock,
   AlertTriangle,
-  TrendingUp,
-  Truck,
   AlertCircle,
   CalendarDays,
 } from "lucide-react";
 import type { DashboardState } from "@/lib/api";
-
-function SupplierCountdown({ deadline }: { deadline: { name: string; time: string; note: string } }) {
-  const now = new Date();
-  const mskNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
-  const [h, m] = deadline.time.split(":").map(Number);
-  const deadlineTime = new Date(mskNow);
-  deadlineTime.setHours(h, m, 0, 0);
-  const diffMs = deadlineTime.getTime() - mskNow.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const isPast = diffMin < 0;
-  const isUrgent = !isPast && diffMin < 60;
-
-  return (
-    <div
-      className={`flex items-center justify-between gap-3 p-3 rounded-md ${
-        isPast
-          ? "bg-zinc-500/10"
-          : isUrgent
-          ? "bg-amber-500/10 border border-amber-500/20"
-          : "bg-muted/50"
-      }`}
-      data-testid={`supplier-${deadline.name}`}
-    >
-      <div className="flex items-center gap-2">
-        <Truck className={`w-4 h-4 ${isPast ? "text-zinc-500" : isUrgent ? "text-amber-400" : "text-muted-foreground"}`} />
-        <span className={`font-medium ${isPast ? "text-zinc-500 line-through" : ""}`}>{deadline.name}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">до {deadline.time}</span>
-        {!isPast && (
-          <Badge variant="outline" className={`text-xs ${isUrgent ? "border-amber-500/30 text-amber-400" : "text-muted-foreground"}`}>
-            {Math.floor(diffMin / 60)}ч {diffMin % 60}м
-          </Badge>
-        )}
-        {isPast && (
-          <Badge variant="outline" className="text-xs text-zinc-500 border-zinc-500/30">
-            Истекло
-          </Badge>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function WeekShiftsCard({ data }: { data: DashboardState }) {
   const grid = data.shift_grid;
@@ -285,41 +240,6 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
               <p className="text-sm text-muted-foreground">Сегодня смены не указаны</p>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 pb-3">
-          <Truck className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base">Дедлайны поставщиков</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {(data.supplier_deadlines || []).map((d) => (
-              <SupplierCountdown key={d.name} deadline={d} />
-            ))}
-            {!data.supplier_deadlines?.length && (
-              <p className="text-sm text-muted-foreground">Поставщики на сегодня не заданы</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 pb-3">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base">Финансы</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.finance ? (
-            <div className="space-y-2 text-sm">
-              <pre className="text-muted-foreground whitespace-pre-wrap">
-                {JSON.stringify(data.finance, null, 2)}
-              </pre>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Финансовые данные не доступны</p>
-          )}
         </CardContent>
       </Card>
     </div>
