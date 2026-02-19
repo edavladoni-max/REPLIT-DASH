@@ -10,6 +10,7 @@ Dark-themed operational dashboard for a multi-location foodtruck/food-service bu
 - **SSH**: Credentials from VPS_VL secret (format: `user@host:password`)
 - **Agent Command Queue**: local API + PostgreSQL table `agent_commands` for confirm/start/finish workflow
 - **MemOS Auto-Context**: on command creation dashboard can auto-fetch relevant memory context from MemOS (`/product/search`)
+- **Agent Worker**: optional server-side runner that automatically executes `confirmed` commands via OpenClaw CLI
 
 ## Key Technical Details
 - SSH tunnel with keepalive, auto-reconnect on disconnect
@@ -17,6 +18,7 @@ Dark-themed operational dashboard for a multi-location foodtruck/food-service bu
 - Agent command routes are local (not proxied): `/api/agent/*`
 - MemOS context can be auto-injected when `memosContext` is empty and query/title is provided
 - Local env files are auto-loaded on server start: `.env` then `.env.local` (local overrides)
+- Auto-worker polls confirmed commands and moves lifecycle to `in_progress -> completed/failed`
 - VPS API port: 8080 (env var VPS_API_PORT)
 - Auto-refresh: 30s polling via TanStack Query refetchInterval
 - Dark mode permanently enabled (class="dark" on html element)
@@ -67,6 +69,14 @@ shared/schema.ts      - Drizzle schema (minimal, app uses external API)
 - MEMOS_READABLE_CUBES: comma-separated cube IDs for retrieval scope
 - MEMOS_TOP_K: number of memories to fetch per command (default `6`)
 - MEMOS_TIMEOUT_MS: timeout for MemOS search calls (default `7000`)
+- AGENT_WORKER_ENABLED: enable automatic execution worker (`true|false`, default `false`)
+- AGENT_WORKER_RUNNER: `openclaw` or `noop`
+- AGENT_WORKER_INTERVAL_MS: polling interval
+- AGENT_WORKER_BATCH_SIZE: number of commands per polling tick
+- AGENT_WORKER_ACTOR: actor label used in command lifecycle
+- AGENT_WORKER_EXEC_TIMEOUT_MS: hard execution timeout
+- AGENT_WORKER_PROMPT_CONTEXT_CHARS: MemOS context chars injected into worker prompt
+- AGENT_WORKER_OPENCLAW_AGENT / AGENT_WORKER_OPENCLAW_*: OpenClaw dispatch settings
 
 ## API Endpoints (proxied to VPS)
 GET: /api/state, /api/order/catalog, /api/salary/calculate, /api/routines, /api/overrides, /api/journal, /api/reports/daily
@@ -74,4 +84,5 @@ POST: /api/tasks/toggle, /api/tasks/add, /api/checklist/complete, /api/sync, /ap
 
 ## API Endpoints (local command queue)
 GET: /api/agent/health, /api/agent/commands
-POST: /api/agent/commands, /api/agent/memos/search, /api/agent/commands/:id/confirm, /api/agent/commands/:id/reject, /api/agent/commands/:id/start, /api/agent/commands/:id/complete, /api/agent/commands/:id/fail, /api/agent/commands/:id/context
+GET: /api/agent/worker
+POST: /api/agent/commands, /api/agent/memos/search, /api/agent/worker/run-once, /api/agent/commands/:id/confirm, /api/agent/commands/:id/reject, /api/agent/commands/:id/start, /api/agent/commands/:id/complete, /api/agent/commands/:id/fail, /api/agent/commands/:id/context

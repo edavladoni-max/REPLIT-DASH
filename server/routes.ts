@@ -13,6 +13,7 @@ import {
   updateContextSchema,
   type AgentCommandStoreSetup,
 } from "./agent-commands";
+import { createAgentCommandWorker } from "./agent-worker";
 import { createMemosAutoContextProvider } from "./memos-context";
 import { ZodError } from "zod";
 
@@ -208,6 +209,8 @@ export async function registerRoutes(
   const commandStoreSetup: AgentCommandStoreSetup = await createAgentCommandStore();
   const commandStore: AgentCommandStore = commandStoreSetup.store;
   const memosAutoContext = createMemosAutoContextProvider();
+  const commandWorker = createAgentCommandWorker(commandStore, commandStoreSetup.mode);
+  commandWorker.start();
 
   app.get("/api/agent/health", (_req: Request, res: Response) => {
     res.json({
@@ -216,8 +219,22 @@ export async function registerRoutes(
         mode: commandStoreSetup.mode,
         reason: commandStoreSetup.reason || "",
         memos: memosAutoContext.status(),
+        worker: commandWorker.status(),
       },
     });
+  });
+
+  app.get("/api/agent/worker", (_req: Request, res: Response) => {
+    res.json({ ok: true, data: commandWorker.status() });
+  });
+
+  app.post("/api/agent/worker/run-once", async (_req: Request, res: Response) => {
+    try {
+      const data = await commandWorker.runOnce();
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
   });
 
   app.get("/api/agent/commands", async (req: Request, res: Response) => {
