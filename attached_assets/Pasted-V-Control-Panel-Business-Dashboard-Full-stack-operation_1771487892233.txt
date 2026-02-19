@@ -1,0 +1,47 @@
+VЛАДОНИ Control Panel — Business Dashboard
+
+Full-stack operational dashboard for a multi-location foodtruck business (Saint Petersburg, Russia). Connected to a Python backend server via REST API running on a remote VPS (credentials stored in secret VPS_VL as user@ip:password).
+
+Tech Stack:
+- Backend proxy: Node.js/Express server that connects to VPS via SSH tunnel and forwards API calls to the Python server running on port 18789 (OpenClaw gateway)
+- Frontend: Vanilla JS + HTML/CSS (no frameworks), served as static files
+- Language: Russian interface
+- Timezone: Europe/Moscow (UTC+3)
+
+Core API endpoints on VPS port 18789:
+GET /api/state → full dashboard state
+GET /api/routines → recurring task routines
+GET /api/overrides → schedule overrides
+GET /api/salary/calculate → payroll calculation
+GET /api/order/catalog → supplier order catalog
+POST /api/tasks/add → add task
+POST /api/tasks/toggle → check/uncheck task
+POST /api/shifts/save → save shift edits
+POST /api/grid/assign → assign employee to shift cell
+POST /api/sync → trigger workspace sync
+POST /api/day/regenerate → regenerate today's task snapshot
+
+/api/state returns JSON with: today date, today_shifts, location_statuses (ФЛАГШТОК/SOUND/SPACEBOX), tasks_today, supplier_deadlines (ИМБИРЬ 13:30, ВОДАМОЛОКО 16:00, САЙРАНФУД 19:00), deliveries, finance, key_dates, shift_grid (week grid with employees), priority_queue, hot_zone (overdue tasks/alerts), daily_checklist, employees list.
+
+Dashboard has 7 tabs (all in Russian):
+1. Главная — current day: location statuses with color badges (working/events_only/closed), today's shifts, hot zone (overdue tasks, alerts in red), supplier deadlines countdown, finance card, key dates
+2. Задачи — task checkboxes with optimistic toggle via POST /api/tasks/toggle, priority colors, daily checklist with time labels, recurring tasks
+3. Смены — weekly grid (ФЛАГШТОК × SOUND × SPACEBOX Алпенхаус, Mon–Sun), employee assignment per cell, shift times, staffing completeness indicator
+4. Поставщики — supplier order constructor by vendor, catalog items, deadline confirmation
+5. Финансы — revenue/cash/card per day per location
+6. Журнал — event log feed for the day
+7. Расписание/Зарплата — weekly schedule draft, salary calculation by hours × rate
+
+UX rules:
+- Sticky header: shows clock (MSK live), company name VЛАДОНИ, tab navigation, today's date chip
+- Dark theme with accent colors: red for alerts, green for OK, yellow for warnings
+- Cards auto-refresh every 30s via GET /api/state
+- Mobile-friendly: collapsible sections
+- 3 locations: ФЛАГШТОК (active), SOUND (events only), SPACEBOX Алпенхаус (opens April 2026)
+
+Business context:
+- Foodtruck company, ~10 staff
+- Suppliers: ИМБИРЬ (deadline 13:30), ВОДАМОЛОКО (16:00), САЙРАНФУД (19:00)
+- Weekly payroll: calculated Tue, paid Wed
+
+First: connect via SSH to VPS (VPS_VL secret = user@ip:password), test GET on port 18789 /api/state to see real data structure, then build the full dashboard based on actual response.
