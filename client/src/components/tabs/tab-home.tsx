@@ -2,52 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  MapPin,
   Clock,
   AlertTriangle,
   TrendingUp,
-  Calendar,
   Truck,
-  CheckCircle2,
-  XCircle,
   AlertCircle,
+  CalendarDays,
 } from "lucide-react";
 import type { DashboardState } from "@/lib/api";
-
-function LocationCard({ status }: { status: { name: string; status: string; note: string } }) {
-  const getStatusColor = (s: string) => {
-    if (s === "working" || s === "active") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-    if (s === "events_only") return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-    return "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
-  };
-
-  const getStatusLabel = (s: string) => {
-    if (s === "working" || s === "active") return "Работает";
-    if (s === "events_only") return "Мероприятия";
-    return "Закрыто";
-  };
-
-  const getStatusIcon = (s: string) => {
-    if (s === "working" || s === "active") return <CheckCircle2 className="w-4 h-4" />;
-    if (s === "events_only") return <AlertCircle className="w-4 h-4" />;
-    return <XCircle className="w-4 h-4" />;
-  };
-
-  return (
-    <div className="flex items-center justify-between gap-3 p-3 rounded-md bg-muted/50" data-testid={`location-${status.name}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-        <span className="font-medium truncate">{status.name}</span>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <Badge variant="outline" className={`${getStatusColor(status.status)} text-xs border`}>
-          {getStatusIcon(status.status)}
-          <span className="ml-1">{getStatusLabel(status.status)}</span>
-        </Badge>
-      </div>
-    </div>
-  );
-}
 
 function SupplierCountdown({ deadline }: { deadline: { name: string; time: string; note: string } }) {
   const now = new Date();
@@ -92,11 +54,136 @@ function SupplierCountdown({ deadline }: { deadline: { name: string; time: strin
   );
 }
 
+function WeekShiftsCard({ data }: { data: DashboardState }) {
+  const grid = data.shift_grid;
+  if (!grid) {
+    return (
+      <Card className="lg:col-span-2">
+        <CardHeader className="flex flex-row items-center gap-2 pb-3">
+          <CalendarDays className="w-5 h-5 text-primary" />
+          <CardTitle className="text-base">Смены недели</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Данные недельных смен не доступны</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const weekDates: any[] = Array.isArray(grid.week_dates) ? grid.week_dates : [];
+  const locations: string[] = Array.isArray(grid.locations) ? grid.locations : [];
+  const cells: Record<string, any> = grid.cells || {};
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="w-5 h-5 text-primary" />
+          <CardTitle className="text-base">{grid.week_title || "Смены недели"}</CardTitle>
+        </div>
+        {grid.summary && (
+          <Badge variant="secondary" className="text-xs">
+            {grid.summary.filled}/{grid.summary.total_slots} заполнено
+          </Badge>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto -mx-6 px-6">
+          <table className="w-full min-w-[760px] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 w-32 border-b border-border/50 bg-card p-2 text-left font-medium text-muted-foreground">
+                  Локация
+                </th>
+                {weekDates.map((wd: any) => {
+                  const dateIso = typeof wd === "string" ? wd : wd.date_iso;
+                  const label = typeof wd === "string" ? "" : wd.weekday_label;
+                  const display = typeof wd === "string" ? wd : wd.date_display;
+                  const isToday = typeof wd === "object" && wd.is_today;
+                  const isPast = typeof wd === "object" && wd.is_past;
+                  const shortDisplay =
+                    typeof display === "string" ? display.split(".").slice(0, 2).join(".") : "";
+                  return (
+                    <th
+                      key={dateIso}
+                      className={`border-b border-border/50 p-2 text-center font-medium ${
+                        isToday
+                          ? "text-primary"
+                          : isPast
+                            ? "text-muted-foreground/50"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      <div className={`${isToday ? "rounded-md bg-primary/10 px-2 py-1" : ""}`}>
+                        <div className="text-xs uppercase">{label}</div>
+                        <div className="text-sm">{shortDisplay}</div>
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {locations.map((loc) => (
+                <tr key={loc}>
+                  <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border/30 bg-card p-2 text-sm font-medium">
+                    {loc}
+                  </td>
+                  {weekDates.map((wd: any) => {
+                    const dateIso = typeof wd === "string" ? wd : wd.date_iso;
+                    const isToday = typeof wd === "object" && wd.is_today;
+                    const cellKey = `${dateIso}:${loc}`;
+                    const cell = cells[cellKey];
+                    const employees: any[] = Array.isArray(cell?.employees) ? cell.employees : [];
+                    const event = String(cell?.event || "");
+                    const status = String(cell?.status || "off");
+
+                    return (
+                      <td
+                        key={dateIso}
+                        className={`border-b border-border/30 p-2 align-top text-center ${
+                          isToday ? "bg-primary/5" : ""
+                        }`}
+                      >
+                        {employees.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {employees.map((emp: any, idx: number) => (
+                              <div key={idx} className="text-xs">
+                                {typeof emp === "string" ? emp : emp?.name || ""}
+                              </div>
+                            ))}
+                          </div>
+                        ) : status === "off" ? (
+                          <span className="text-[10px] text-muted-foreground/50">выходной</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-400/80">нужен сотрудник</span>
+                        )}
+                        {event && (
+                          <div
+                            className="mx-auto mt-1 max-w-[120px] truncate text-[10px] text-amber-400/80"
+                            title={event}
+                          >
+                            {event}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading: boolean }) {
   if (isLoading || !data) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <Card key={i}>
             <CardHeader className="pb-3">
               <Skeleton className="h-5 w-40" />
@@ -115,6 +202,11 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
   }
 
   const hotCount = data.hot_zone?.total_count || 0;
+  const overdueTasks = data.hot_zone?.overdue_tasks || [];
+  const staleTasks = data.hot_zone?.stale_tasks || [];
+  const upcomingDeadlines = data.hot_zone?.upcoming_deadlines || [];
+  const staffingWarnings = data.hot_zone?.staffing_warnings || [];
+  const triggeredAlerts = data.hot_zone?.triggered_alerts || [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4" data-testid="tab-home">
@@ -128,31 +220,31 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.hot_zone.overdue_tasks.map((t) => (
+              {overdueTasks.map((t) => (
                 <div key={t.id} className="flex items-start gap-2 p-2 rounded-md bg-red-500/10 text-sm">
                   <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
                   <span className="text-red-300">{t.text}</span>
                 </div>
               ))}
-              {data.hot_zone.stale_tasks.map((t) => (
+              {staleTasks.map((t) => (
                 <div key={t.id} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-sm">
                   <Clock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                   <span className="text-amber-300">{t.text}</span>
                 </div>
               ))}
-              {data.hot_zone.upcoming_deadlines.map((t) => (
+              {upcomingDeadlines.map((t) => (
                 <div key={t.id} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-sm">
                   <Clock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                   <span>{t.text} — {t.deadline_at_msk}</span>
                 </div>
               ))}
-              {data.hot_zone.staffing_warnings.map((w: any, i: number) => (
+              {staffingWarnings.map((w: any, i: number) => (
                 <div key={`sw-${i}`} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-sm">
                   <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                   <span>{typeof w === "string" ? w : w.text || JSON.stringify(w)}</span>
                 </div>
               ))}
-              {data.hot_zone.triggered_alerts.map((a: any, i: number) => (
+              {triggeredAlerts.map((a: any, i: number) => (
                 <div key={`ta-${i}`} className={`flex items-start gap-2 p-2 rounded-md text-sm ${
                   a.severity === "critical" ? "bg-red-500/10" : "bg-amber-500/10"
                 }`}>
@@ -169,19 +261,7 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 pb-3">
-          <MapPin className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base">Локации</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {data.location_statuses.map((s) => (
-              <LocationCard key={s.name} status={s} />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <WeekShiftsCard data={data} />
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-2 pb-3">
@@ -190,7 +270,7 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {data.today_shifts.map((shift, i) => {
+            {(data.today_shifts || []).map((shift, i) => {
               const parts = shift.replace(/\*\*/g, "").split(":");
               const loc = parts[0]?.trim();
               const info = parts.slice(1).join(":").trim();
@@ -201,6 +281,9 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
                 </div>
               );
             })}
+            {!data.today_shifts?.length && (
+              <p className="text-sm text-muted-foreground">Сегодня смены не указаны</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -212,9 +295,12 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {data.supplier_deadlines.map((d) => (
+            {(data.supplier_deadlines || []).map((d) => (
               <SupplierCountdown key={d.name} deadline={d} />
             ))}
+            {!data.supplier_deadlines?.length && (
+              <p className="text-sm text-muted-foreground">Поставщики на сегодня не заданы</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -236,65 +322,6 @@ export function TabHome({ data, isLoading }: { data?: DashboardState; isLoading:
           )}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 pb-3">
-          <Calendar className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base">Ключевые даты</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {data.key_dates.map((kd, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-md bg-muted/50">
-                <Badge variant="outline" className="shrink-0 text-xs font-mono">
-                  {kd.date_display}
-                </Badge>
-                <span className="text-sm">{kd.description}</span>
-              </div>
-            ))}
-            {data.key_dates.length === 0 && (
-              <p className="text-sm text-muted-foreground">Нет ключевых дат</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {data.concert_tomorrow && data.concert_tomorrow.items && data.concert_tomorrow.items.length > 0 && (
-        <Card className="lg:col-span-2 border-amber-500/20">
-          <CardHeader className="flex flex-row items-center gap-2 pb-3">
-            <AlertCircle className="w-5 h-5 text-amber-400" />
-            <CardTitle className="text-base">
-              Мероприятия завтра ({data.concert_tomorrow.tomorrow_date_iso})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {data.concert_tomorrow.items.map((item: any, i: number) => (
-                <div
-                  key={i}
-                  className={`p-3 rounded-md text-sm ${
-                    item.severity === "critical" ? "bg-red-500/10 border border-red-500/20" : "bg-amber-500/10"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{item.location}: {item.event}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Аудитория: {item.audience} · Персонал: {item.employees?.join(", ")} ({item.assigned_count}/{item.target_staff})
-                      </p>
-                    </div>
-                    {item.needs_second_staff && (
-                      <Badge variant="destructive" className="text-xs shrink-0">
-                        Нужен ещё
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
