@@ -8,10 +8,12 @@ Dark-themed operational dashboard for a multi-location foodtruck/food-service bu
 - **Backend**: Express.js proxy that tunnels requests to a Python API on VPS via SSH (ssh2 library)
 - **API Auth**: HTTP Basic Auth (admin/password from DASHBOARD_PASSWORD env var)
 - **SSH**: Credentials from VPS_VL secret (format: `user@host:password`)
+- **Agent Command Queue**: local API + PostgreSQL table `agent_commands` for confirm/start/finish workflow
 
 ## Key Technical Details
 - SSH tunnel with keepalive, auto-reconnect on disconnect
 - All API routes proxied: GET/POST forwarded through SSH forwardOut
+- Agent command routes are local (not proxied): `/api/agent/*`
 - VPS API port: 8080 (env var VPS_API_PORT)
 - Auto-refresh: 30s polling via TanStack Query refetchInterval
 - Dark mode permanently enabled (class="dark" on html element)
@@ -23,7 +25,7 @@ server/
   index.ts           - Express + Vite server setup
 client/src/
   App.tsx             - Root app, QueryClient, router
-  pages/dashboard.tsx - Main dashboard with 7 tabs
+  pages/dashboard.tsx - Main dashboard with 8 tabs
   components/
     msk-clock.tsx     - Moscow time clock display
     tabs/
@@ -34,7 +36,9 @@ client/src/
       tab-finance.tsx   - Финансы: financial reports
       tab-journal.tsx   - Журнал: daily event log
       tab-salary.tsx    - ЗП: salary calculation, employee directory, routines
+      tab-agent.tsx     - Команды: queue with confirmation and execution status
   hooks/use-dashboard.ts - React Query hooks for all API endpoints
+  hooks/use-agent-commands.ts - React Query hooks for command queue
   lib/api.ts          - TypeScript interfaces for API response types
 shared/schema.ts      - Drizzle schema (minimal, app uses external API)
 ```
@@ -47,12 +51,18 @@ shared/schema.ts      - Drizzle schema (minimal, app uses external API)
 5. Финансы (Finance) - financial data
 6. Журнал (Journal) - event log
 7. ЗП (Salary) - salary calculations
+8. Команды (Commands) - agent task queue and confirmation flow
 
 ## Environment Secrets
 - VPS_VL: SSH credentials (user@host:password)
 - DASHBOARD_PASSWORD: API Basic Auth password
 - SESSION_SECRET: Express session secret
+- DATABASE_URL: PostgreSQL connection string for persistent `agent_commands` table
 
 ## API Endpoints (proxied to VPS)
 GET: /api/state, /api/order/catalog, /api/salary/calculate, /api/routines, /api/overrides, /api/journal, /api/reports/daily
 POST: /api/tasks/toggle, /api/tasks/add, /api/checklist/complete, /api/sync, /api/day/regenerate, /api/grid/cell/save, etc.
+
+## API Endpoints (local command queue)
+GET: /api/agent/health, /api/agent/commands
+POST: /api/agent/commands, /api/agent/commands/:id/confirm, /api/agent/commands/:id/reject, /api/agent/commands/:id/start, /api/agent/commands/:id/complete, /api/agent/commands/:id/fail, /api/agent/commands/:id/context

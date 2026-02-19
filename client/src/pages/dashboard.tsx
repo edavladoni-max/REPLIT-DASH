@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Home,
+  Bot,
   ListTodo,
   CalendarDays,
   Truck,
@@ -25,6 +26,7 @@ import { TabSuppliers } from "@/components/tabs/tab-suppliers";
 import { TabFinance } from "@/components/tabs/tab-finance";
 import { TabJournal } from "@/components/tabs/tab-journal";
 import { TabSalary } from "@/components/tabs/tab-salary";
+import { TabAgent } from "@/components/tabs/tab-agent";
 import { useDashboardState, useSyncWorkspace } from "@/hooks/use-dashboard";
 
 const TAB_CONFIG = [
@@ -35,6 +37,7 @@ const TAB_CONFIG = [
   { id: "finance", label: "Финансы", icon: TrendingUp },
   { id: "journal", label: "Журнал", icon: ScrollText },
   { id: "salary", label: "ЗП", icon: Wallet },
+  { id: "agent", label: "Команды", icon: Bot },
 ];
 
 export default function Dashboard() {
@@ -178,6 +181,9 @@ export default function Dashboard() {
             </TabsContent>
             <TabsContent value="salary" className="mt-0">
               <TabSalary data={dashData} isLoading={isLoading} />
+            </TabsContent>
+            <TabsContent value="agent" className="mt-0">
+              <TabAgent />
             </TabsContent>
           </div>
         </div>

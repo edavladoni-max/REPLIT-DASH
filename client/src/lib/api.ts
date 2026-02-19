@@ -90,6 +90,37 @@ export interface ShiftGridCell {
   source_rows: number;
 }
 
+export type AgentCommandStatus =
+  | "pending_confirmation"
+  | "confirmed"
+  | "rejected"
+  | "in_progress"
+  | "completed"
+  | "failed";
+
+export interface AgentCommand {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  source: string;
+  title: string;
+  details: string;
+  status: AgentCommandStatus;
+  requiresConfirmation: boolean;
+  confirmationPrompt: string;
+  memosQuery: string;
+  memosContext: string;
+  createdBy: string;
+  confirmedBy: string;
+  confirmedAt: string;
+  startedBy: string;
+  startedAt: string;
+  finishedBy: string;
+  finishedAt: string;
+  result: string;
+  error: string;
+}
+
 export interface HotZone {
   overdue_tasks: Task[];
   stale_tasks: Task[];

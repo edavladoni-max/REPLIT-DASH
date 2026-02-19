@@ -1,6 +1,19 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { Client } from "ssh2";
+import {
+  AgentCommandError,
+  createAgentCommandSchema,
+  createAgentCommandStore,
+  type AgentCommandStore,
+  listAgentCommandsQuerySchema,
+  actorSchema,
+  rejectAgentCommandSchema,
+  finishAgentCommandSchema,
+  updateContextSchema,
+  type AgentCommandStoreSetup,
+} from "./agent-commands";
+import { ZodError } from "zod";
 
 let sshConnection: Client | null = null;
 let sshReady = false;
@@ -167,10 +180,126 @@ function proxyToVPS(
   });
 }
 
+function sendAgentCommandError(res: Response, error: unknown) {
+  if (error instanceof AgentCommandError) {
+    res.status(error.statusCode).json({ ok: false, error: error.message });
+    return;
+  }
+  if (error instanceof ZodError) {
+    const message = error.issues.map((issue) => issue.message).join("; ");
+    res.status(400).json({ ok: false, error: message || "Invalid payload." });
+    return;
+  }
+  res.status(500).json({
+    ok: false,
+    error: error instanceof Error ? error.message : "Unexpected error",
+  });
+}
+
+function resolveCommandId(req: Request): string {
+  return String(req.params.id || "").trim();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const commandStoreSetup: AgentCommandStoreSetup = await createAgentCommandStore();
+  const commandStore: AgentCommandStore = commandStoreSetup.store;
+
+  app.get("/api/agent/health", (_req: Request, res: Response) => {
+    res.json({
+      ok: true,
+      data: {
+        mode: commandStoreSetup.mode,
+        reason: commandStoreSetup.reason || "",
+      },
+    });
+  });
+
+  app.get("/api/agent/commands", async (req: Request, res: Response) => {
+    try {
+      const parsed = listAgentCommandsQuerySchema.parse({
+        status: req.query.status,
+        limit: req.query.limit,
+      });
+      const data = await commandStore.list(parsed);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands", async (req: Request, res: Response) => {
+    try {
+      const payload = createAgentCommandSchema.parse(req.body || {});
+      const data = await commandStore.create(payload);
+      res.status(201).json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands/:id/confirm", async (req: Request, res: Response) => {
+    try {
+      const input = actorSchema.parse(req.body || {});
+      const data = await commandStore.confirm(resolveCommandId(req), input);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands/:id/reject", async (req: Request, res: Response) => {
+    try {
+      const input = rejectAgentCommandSchema.parse(req.body || {});
+      const data = await commandStore.reject(resolveCommandId(req), input);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands/:id/start", async (req: Request, res: Response) => {
+    try {
+      const input = actorSchema.parse(req.body || {});
+      const data = await commandStore.start(resolveCommandId(req), input);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands/:id/complete", async (req: Request, res: Response) => {
+    try {
+      const input = finishAgentCommandSchema.parse(req.body || {});
+      const data = await commandStore.complete(resolveCommandId(req), input);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands/:id/fail", async (req: Request, res: Response) => {
+    try {
+      const input = finishAgentCommandSchema.parse(req.body || {});
+      const data = await commandStore.fail(resolveCommandId(req), input);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
+  app.post("/api/agent/commands/:id/context", async (req: Request, res: Response) => {
+    try {
+      const input = updateContextSchema.parse(req.body || {});
+      const data = await commandStore.updateContext(resolveCommandId(req), input);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendAgentCommandError(res, error);
+    }
+  });
+
   const GET_ROUTES = [
     "/api/state",
     "/api/order/catalog",
